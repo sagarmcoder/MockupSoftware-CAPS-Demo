@@ -54,6 +54,15 @@ Verify the API with `npm run smoke --prefix backend`.
 
 ## CAPS Guard payroll demo
 
+
+
+
+
+
+
+
+Payroll is the example domain; bounded capability execution is the actual architecture.
+
 The payroll panel uses three fixed, synthetic scenarios behind a server-owned
 CAPS Guard boundary:
 
