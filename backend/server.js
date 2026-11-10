@@ -4,14 +4,16 @@ import {
   approveCapsReview,
   getCapsArtifact,
   listCapsScenarios,
+  resolveLocalOllamaEmployeeSelection,
   runCapsScenario,
   resolveLocalOllamaPayrollReview,
-  runLocalOllamaPayrollAgent
+  runLocalOllamaPayrollAgent,
+  NATIVE_INTERNAL_TOKEN
 } from "./caps-guard-bridge.js";
 import {listMcpTools,runMcpPayrollIntent} from "./mcp-agent.js";
 import {resolveLocalMcpEmployeeSelection,resolveLocalMcpPayrollReview,runLocalMcpPayrollAgent} from "./local-agent-process.js";
-import {closePayrollMcpSession} from "./mcp-client.js";
-import {createCapsTraceId,openCapsEventStream,publishCapsLifecycle,publishCapsRunFailure,publishCapsRunLifecycle} from "./caps-guard-events.js";
+import {callPayrollMcpTool,closePayrollMcpSession,getLastMcpTiming,getMcpReadiness,listPayrollMcpTools,warmPayrollMcpSession} from "./mcp-client.js";
+import {createCapsTraceId,getCapsLifecycleTiming,openCapsEventStream,publishCapsLifecycle,publishCapsRunFailure,publishCapsRunLifecycle} from "./caps-guard-events.js";
 
 const app=createApiServer();
 const port=Number(process.env.API_PORT||3001);
@@ -21,18 +23,19 @@ function lifecycleTraceId(request){
 }
 
 function attachLifecycleTrace(result,traceId){
-  return result&&typeof result==="object"?{...result,lifecycleTraceId:traceId}:result;
+  return result&&typeof result==="object"?{...result,lifecycleTraceId:traceId,lifecycleTiming:getCapsLifecycleTiming(traceId)}:result;
 }
 
 async function runWithLifecycle(request,response,source,operation){
   const traceId=lifecycleTraceId(request);
-  publishCapsLifecycle(traceId,{nodeId:"request",status:"completed",detail:"Request received",source});
-  publishCapsLifecycle(traceId,{nodeId:"intent",status:"running",detail:source==="native-agent"?"Local Ollama is interpreting":"Bounded agent is interpreting",source});
-  publishCapsLifecycle(traceId,{nodeId:"mcp",status:"running",detail:"Capability route is processing",source});
+  const continuation=source==="native-agent-review"||source==="native-agent-selection";
+  publishCapsLifecycle(traceId,{nodeId:"request",status:"completed",detail:continuation?"Continuation request received":"Request received",source});
+  publishCapsLifecycle(traceId,{nodeId:"intent",status:continuation?"skipped":"running",detail:continuation?"Existing bounded intent is being resumed":source==="native-agent"?"Local Ollama is interpreting":"Bounded agent is interpreting",source});
+  publishCapsLifecycle(traceId,{nodeId:"mcp",status:"running",detail:continuation?"Persisted capability continuation is processing":"Capability route is processing",source});
   try{
     const result=await operation(traceId);
+    publishCapsRunLifecycle(traceId,result,{source});
     const withTrace=attachLifecycleTrace(result,traceId);
-    publishCapsRunLifecycle(traceId,withTrace,{source});
     response.json(withTrace);
   }catch(error){
     publishCapsRunFailure(traceId,error,{source});
@@ -87,7 +90,36 @@ app.post("/api/mcp/native-agent",async(request,response)=>{
 });
 
 app.post("/api/mcp/native-agent/reviews/:reviewId/:decision",async(request,response)=>{
-  await runWithLifecycle(request,response,"native-agent",()=>resolveLocalOllamaPayrollReview(request.params.reviewId,request.params.decision));
+  await runWithLifecycle(request,response,"native-agent-review",()=>resolveLocalOllamaPayrollReview(request.params.reviewId,request.params.decision));
+});
+
+app.post("/api/mcp/native-agent/sessions/:sessionId/employee",async(request,response)=>{
+  await runWithLifecycle(request,response,"native-agent-selection",()=>resolveLocalOllamaEmployeeSelection(request.params.sessionId,request.body?.employeeId));
+});
+
+// Private loopback handoff for the native Python runner. The Python start and
+// resume processes are intentionally short-lived, while this backend owns the
+// long-lived official MCP v2 client/session. This route is not public API and
+// accepts only the two server-owned native capabilities.
+app.post("/api/mcp/native-internal",async(request,response)=>{
+  if(request.headers["x-caps-native-token"]!==NATIVE_INTERNAL_TOKEN){
+    return response.status(403).json({error:"Native MCP internal token rejected"});
+  }
+  const body=request.body||{};
+  try{
+    if(body.op==="tools/list"&&Object.keys(body).length===1){
+      const tools=await listPayrollMcpTools();
+      return response.json({ok:true,tools:tools.map((tool)=>tool.name),mcp_timing:getLastMcpTiming()});
+    }
+    const allowed=new Set(["search_employee_profiles","route_payroll_intent","resolve_payroll_review"]);
+    if(body.op!=="tools/call"||!allowed.has(body.name)||!body.arguments||typeof body.arguments!=="object"||Array.isArray(body.arguments)||Object.keys(body).some((key)=>!["op","name","arguments"].includes(key))){
+      return response.status(400).json({error:"Native MCP request is outside the bounded payroll contract"});
+    }
+    const result=await callPayrollMcpTool(body.name,body.arguments);
+    return response.json({ok:true,result,mcp_timing:getLastMcpTiming()});
+  }catch(error){
+    return response.status(502).json({ok:false,error:error.message});
+  }
 });
 
 app.post("/api/caps-guard/scenarios/:scenarioKey",async(request,response)=>{
@@ -116,6 +148,17 @@ app.get("/api/health",(_request,response)=>{
     getSqliteDatabase().prepare("SELECT 1 AS ok").get();
     response.json({status:"ok",database:"connected",provider:"sqlite"});
   }catch(error){response.status(503).json({status:"error",message:error.message});}
+});
+
+app.get("/api/native/readiness",(_request,response)=>{
+  const mcp=getMcpReadiness();
+  response.status(mcp.status==="failed"?503:200).json({
+    status:mcp.status,
+    mcp,
+    ollama:{status:"external",detail:"Check Ollama with curl http://127.0.0.1:11434/api/tags"},
+    native_worker:{status:"per_request",detail:"Python/LangGraph runner starts per native request"},
+    caps:{status:"ready",detail:"Server-owned CAPS Guard routes are available"}
+  });
 });
 
 app.get("/api/summary-dashboard",(_request,response,next)=>{
@@ -398,6 +441,9 @@ app.use((error,_request,response,_next)=>{
   response.status(500).json({error:"Database request failed",detail:error.message});
 });
 
-app.listen(port,()=>console.log(`SQLite practice API listening at http://localhost:${port}`));
+app.listen(port,()=>{
+  console.log(`SQLite practice API listening at http://localhost:${port}`);
+  void warmPayrollMcpSession().then((readiness)=>console.log(`Native MCP readiness: ${readiness.status} (${readiness.detail})`));
+});
 process.once("SIGTERM",async()=>{await closePayrollMcpSession();process.exit(0);});
 process.once("SIGINT",async()=>{await closePayrollMcpSession();process.exit(0);});

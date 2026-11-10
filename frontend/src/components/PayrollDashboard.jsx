@@ -17,7 +17,8 @@ export default function PayrollDashboard(){
   const [guardLoading,setGuardLoading]=useState("");
   const [guardError,setGuardError]=useState("");
   const [guardTraceId,setGuardTraceId]=useState("");
-  const [agentPrompt,setAgentPrompt]=useState("Change John's hourly rate to $35 per hour");
+  const [agentPrompt,setAgentPrompt]=useState("Alex, change rate to $42");
+  const [agentMode,setAgentMode]=useState("native");
   const [agentResult,setAgentResult]=useState(null);
   const [agentLoading,setAgentLoading]=useState(false);
   const [agentError,setAgentError]=useState("");
@@ -68,7 +69,8 @@ export default function PayrollDashboard(){
     setAgentResult(null);
     setAgentTraceId(traceId);
     try{
-      const response=await fetch("/api/mcp/local-agent",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:agentPrompt,trace_id:traceId})});
+      const endpoint=agentMode==="native"?"/api/mcp/native-agent":"/api/mcp/local-agent";
+      const response=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:agentPrompt,trace_id:traceId})});
       const result=await response.json();
       if(!response.ok) throw new Error(result.error||`Local agent returned ${response.status}`);
       setAgentTraceId(result.lifecycleTraceId||traceId);
@@ -83,7 +85,8 @@ export default function PayrollDashboard(){
     setAgentLoading(true);
     setAgentError("");
     try{
-      const response=await fetch(`/api/mcp/local-agent/reviews/${encodeURIComponent(reviewId)}/${decision}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({trace_id:agentTraceId||agentResult.lifecycleTraceId})});
+      const endpoint=agentMode==="native"?"/api/mcp/native-agent/reviews":"/api/mcp/local-agent/reviews";
+      const response=await fetch(`${endpoint}/${encodeURIComponent(reviewId)}/${decision}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({trace_id:agentTraceId||agentResult.lifecycleTraceId})});
       const result=await response.json();
       if(!response.ok) throw new Error(result.error||`Local agent review returned ${response.status}`);
       setAgentTraceId(result.lifecycleTraceId||agentTraceId);
@@ -98,7 +101,8 @@ export default function PayrollDashboard(){
     setAgentLoading(true);
     setAgentError("");
     try{
-      const response=await fetch(`/api/mcp/local-agent/sessions/${encodeURIComponent(sessionId)}/employee`,{
+      const route=agentMode==="native"?"native-agent":"local-agent";
+      const response=await fetch(`/api/mcp/${route}/sessions/${encodeURIComponent(sessionId)}/employee`,{
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({employeeId,trace_id:agentTraceId||agentResult.lifecycleTraceId})
@@ -186,15 +190,19 @@ export default function PayrollDashboard(){
     </section>
     <section className="guard-panel local-agent-panel">
       <div className="guard-heading">
-        <div><span className="eyebrow">Real MCP local path</span><h2>Ask the local payroll agent</h2><p>The bounded local agent chooses only advertised MCP capabilities. The MCP server routes them through CAPS Guard, which owns execution, review, and blocking.</p></div>
-        <span className="guard-boundary-state">MCP stdio · CAPS Guard</span>
+        <div><span className="eyebrow">Native demo path</span><h2>Ask the local payroll agent</h2><p>The native path uses local Ollama and LangGraph to produce only a bounded payroll intent. MCP routes it through CAPS Guard, which owns execution, review, and blocking.</p></div>
+        <span className="guard-boundary-state">Ollama · LangGraph · MCP · CAPS</span>
       </div>
       <div className="local-agent-form">
         <label htmlFor="agent-prompt">Natural-language request</label>
         <textarea id="agent-prompt" value={agentPrompt} maxLength="240" onChange={(event)=>setAgentPrompt(event.target.value)} rows="2" />
-        <button className="guard-approve" onClick={runLocalAgent} disabled={agentLoading||!agentPrompt.trim()}>Run local agent</button>
+        <div className="agent-mode-toggle" role="group" aria-label="Agent path">
+          <button className={agentMode==="native"?"is-selected":""} onClick={()=>setAgentMode("native")} disabled={agentLoading}>Native Ollama + LangGraph</button>
+          <button className={agentMode==="deterministic"?"is-selected":""} onClick={()=>setAgentMode("deterministic")} disabled={agentLoading}>Deterministic MCP fallback</button>
+        </div>
+        <button className="guard-approve" onClick={runLocalAgent} disabled={agentLoading||!agentPrompt.trim()}>{agentMode==="native"?"Run native agent":"Run deterministic agent"}</button>
       </div>
-      {agentLoading&&<p className="agent-progress" role="status">The bounded agent is resolving the request through MCP and CAPS Guard. A cold local start can take several minutes on this machine; the page remains responsive.</p>}
+      {agentLoading&&<p className="agent-progress" role="status">{agentMode==="native"?"The native Python/LangGraph runtime is starting, then Ollama will interpret the request before MCP and CAPS Guard. Timing appears in the graph below.":"The bounded agent is resolving the request through MCP and CAPS Guard."}</p>}
       {agentError&&<p className="error guard-error">{agentError}</p>}
       <ExecutionGraph result={agentResult} source="agent" loading={agentLoading} error={agentError} streamId={agentTraceId} />
       {agentResult&&<article className={`guard-result guard-result-${String(agentResult.status||"").toLowerCase()}`}>

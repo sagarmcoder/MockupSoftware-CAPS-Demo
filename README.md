@@ -108,14 +108,19 @@ proof. The approval control is a local synthetic demo reviewer; it is not
 authenticated production RBAC.
 
 The deterministic plan-mode HITL runner and its repeatable tests live in the
-unmerged checkout at
-`../.caps-tools/caps_guard_demo_prep` on branch `demo/payroll-caps-prep`.
-The optional LangGraph/Ollama prompt-mode lifecycle remains separately tracked
-because the local import chain stalled before generation.
+demo-prep checkout at `../.caps-tools/caps_guard_demo_prep` on branch
+`demo/payroll-caps-prep`. The native LangGraph/Ollama/MCP path is also verified
+for review approval, rejection, replay rejection, and payment blocking. It is
+an explicit opt-in local runtime; the first cold request can take roughly
+2–3 minutes while Python/LangGraph and MCP dependencies load, while warm
+actions are much faster. See [`DEMO_RUNBOOK.md`](DEMO_RUNBOOK.md) for the
+recording sequence and [`CAPS_GUARD_PAYROLL_TRACKER.md`](CAPS_GUARD_PAYROLL_TRACKER.md)
+for evidence and limitations.
 
-The dashboard also exposes a real local MCP agent path. The backend starts an official MCP v2 server over stdio and the bounded local agent uses the corresponding MCP client. The server advertises only two constrained capabilities:
+The dashboard also exposes a real local MCP agent path. The backend starts an official MCP v2 server over stdio and the bounded local agent uses the corresponding MCP client. The server advertises only three constrained capabilities:
 
 ```text
+search_employee_profiles  -> bounded employee disambiguation
 route_payroll_intent      -> server-owned CAPS scenario
 resolve_payroll_review    -> persisted CAPS review resume/reject
 ```

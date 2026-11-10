@@ -1,0 +1,43 @@
+{
+  "execution_plan": {
+    "schema_version": "1.0",
+    "plan_id": "plan_payroll_disbursement_block",
+    "intent": "Attempt a synthetic bank payment disbursement.",
+    "steps": [
+      {
+        "id": "disburse_bank_payment",
+        "type": "tool_call",
+        "tool_name": "disburse_bank_payment",
+        "description": "Attempt an irreversible synthetic payroll payment.",
+        "requires_tool": true,
+        "input_keys": [
+          "employee_id",
+          "amount",
+          "currency"
+        ]
+      }
+    ],
+    "final_action": "return_disbursement_status"
+  },
+  "task_graph": {
+    "schema_version": "1.0",
+    "graph_id": "graph_payroll_disbursement_block",
+    "intent": "Attempt a synthetic bank payment disbursement.",
+    "tasks": [
+      {
+        "id": "disburse_bank_payment",
+        "action": "disburse_bank_payment",
+        "params": {
+          "employee_id": "E104",
+          "amount": 80000.0,
+          "currency": "CAD",
+          "reason": "Immediate payroll release"
+        },
+        "depends_on": [],
+        "side_effect": true
+      }
+    ],
+    "needs_clarification": false,
+    "clarification_questions": []
+  }
+}

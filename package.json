@@ -1,0 +1,20 @@
+{
+  "name": "mockup-software-caps-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "install:all": "npm install --prefix backend && npm install --prefix frontend",
+    "db:init": "node scripts/init-sqlite.js",
+    "db:reset": "node scripts/init-sqlite.js",
+    "backend": "npm run start --prefix backend",
+    "backend:watch": "npm run dev --prefix backend",
+    "frontend": "npm run dev --prefix frontend",
+    "caps-guard-smoke": "npm run caps-guard-smoke --prefix backend",
+  "mcp-smoke": "node backend/mcp-agent.test.js",
+  "employee-resolution-smoke": "node backend/employee-resolution.test.js",
+  "employee-resolution-full-smoke": "node backend/employee-resolution-full.test.js",
+  "mcp-full-smoke": "npm run mcp-full-smoke --prefix backend",
+    "mcp-http-smoke": "npm run mcp-http-smoke --prefix backend",
+    "demo": "npx serve simple-html-demo -l 4174"
+  }
+}

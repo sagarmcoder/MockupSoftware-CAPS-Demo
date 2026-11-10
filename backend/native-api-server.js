@@ -104,6 +104,7 @@ export function createApiServer(){
         const wrappedResponse=createResponse(response);
         const wrappedRequest={
           ...request,
+          headers:request.headers,
           query:Object.fromEntries(url.searchParams.entries()),
           params:matchPath(route.path,url.pathname),
           body:{}

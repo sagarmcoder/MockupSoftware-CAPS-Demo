@@ -1,0 +1,41 @@
+{
+  "execution_plan": {
+    "schema_version": "1.0",
+    "plan_id": "plan_payroll_rate_change",
+    "intent": "Change the hourly rate for one synthetic employee.",
+    "steps": [
+      {
+        "id": "change_hourly_rate",
+        "type": "tool_call",
+        "tool_name": "change_hourly_rate",
+        "description": "Propose a new hourly rate for employee E104.",
+        "requires_tool": true,
+        "input_keys": [
+          "employee_id",
+          "new_rate"
+        ]
+      }
+    ],
+    "final_action": "return_rate_change_status"
+  },
+  "task_graph": {
+    "schema_version": "1.0",
+    "graph_id": "graph_payroll_rate_change",
+    "intent": "Change the hourly rate for one synthetic employee.",
+    "tasks": [
+      {
+        "id": "change_hourly_rate",
+        "action": "change_hourly_rate",
+        "params": {
+          "employee_id": "E104",
+          "new_rate": 45.0,
+          "currency": "CAD"
+        },
+        "depends_on": [],
+        "side_effect": true
+      }
+    ],
+    "needs_clarification": false,
+    "clarification_questions": []
+  }
+}

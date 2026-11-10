@@ -1,0 +1,40 @@
+{
+  "execution_plan": {
+    "schema_version": "1.0",
+    "plan_id": "plan_payroll_read_hours",
+    "intent": "Read approved time entries for one employee.",
+    "steps": [
+      {
+        "id": "read_time_entries",
+        "type": "tool_call",
+        "tool_name": "search_time_entries",
+        "description": "Read synthetic time-entry records for employee E104.",
+        "requires_tool": true,
+        "input_keys": [
+          "employee_id",
+          "status"
+        ]
+      }
+    ],
+    "final_action": "return_time_entry_summary"
+  },
+  "task_graph": {
+    "schema_version": "1.0",
+    "graph_id": "graph_payroll_read_hours",
+    "intent": "Read approved time entries for one employee.",
+    "tasks": [
+      {
+        "id": "read_time_entries",
+        "action": "search_time_entries",
+        "params": {
+          "employee_id": "E104",
+          "status": "Approved"
+        },
+        "depends_on": [],
+        "side_effect": false
+      }
+    ],
+    "needs_clarification": false,
+    "clarification_questions": []
+  }
+}

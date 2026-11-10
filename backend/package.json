@@ -1,0 +1,20 @@
+{
+  "name": "mockup-software-api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch server.js",
+    "start": "node server.js",
+    "smoke": "node smoke-test.js",
+    "caps-guard-smoke": "node caps-guard-bridge.test.js",
+    "mcp-full-smoke": "node mcp-full-demo.test.js",
+    "mcp-http-smoke": "node mcp-http-boundary.test.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/client": "^2.4.0",
+    "@modelcontextprotocol/server": "^2.4.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "zod": "^4.6.7"
+  }
+}

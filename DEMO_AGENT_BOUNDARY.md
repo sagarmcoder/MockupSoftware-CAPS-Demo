@@ -1,8 +1,30 @@
 # Mockup Software Agent Boundary
 
-This document defines the safety boundary for the synthetic CAPS Guard demonstration. The bridge is connected to fixed CAPS Guard scenarios, and the local HTTP boundary has been verified through a dependency-light native Node server. Deterministic plan-mode HITL is verified; LangGraph prompt-mode remains a separate local-runtime gate.
+This document defines the safety boundary for the synthetic CAPS Guard demonstration. The bridge is connected to fixed CAPS Guard scenarios, and the local HTTP boundary has been verified through a dependency-light native Node server. Deterministic plan-mode HITL and the native LangGraph/Ollama/MCP demo path are verified for local rehearsal; production authorization remains out of scope.
 
-Current status: the bounded deterministic agent and official MCP v2 stdio path are verified. The reliable `/api/mcp/local-agent` route uses that deterministic planner; the separate native `LangGraph -> local Ollama -> MCP -> CAPS Guard` transport has completed one fresh-process start/approve/replay proof under the isolated Python 3.12 demo runtime, but intermittent checkpoint-import stalls still prevent a complete approve/reject/BLOCK reliability claim.
+Current status: the native path now passes `REVIEW_REQUIRED -> approval -> 1 call / 1 result`, rejection, replay rejection, and payment `BLOCK -> 0 calls -> terminal audit` through the backend-owned persistent MCP session. A first successful native cold start measured about 158 seconds on this machine; warm actions completed in roughly 1–5 seconds. That startup variance is a local runtime limitation, not a CAPS policy result. Production authorization remains out of scope.
+
+## Current native boundary correction — 2026-11-10
+
+The earlier approval stall came from the Python start/resume processes each
+creating a fresh Node MCP client and reloading the official SDK. The native
+runner now sends only its bounded `tools/list` and `tools/call` requests to a
+token-protected loopback endpoint in the long-lived Node backend. That backend
+owns the official MCP v2 client/session and reuses it across the persisted
+LangGraph review pause and resume.
+
+Verified in an isolated backend run:
+
+- Rate change: `REVIEW_REQUIRED` / `NOT_CALLED` → approved `EXECUTED` / `CALLED`, exactly one call/result.
+- Approval replay: `REPLAY_REJECTED` / `NOT_CALLED`.
+- Review rejection: `REJECTED` / `NOT_CALLED`.
+- Payment attempt: `BLOCKED` / `BLOCK` / `NOT_CALLED`, zero calls/results.
+- Invalid loopback token: HTTP `403`.
+
+The cold runtime is still machine-dependent and can take minutes while local
+Python/LangGraph and MCP dependencies load. A timeout remains fail-closed and
+must be reported as runtime unavailable, never as `ALLOW`, `BLOCK`, or a
+successful payroll execution.
 
 ## Project root
 
@@ -164,7 +186,7 @@ The separate local Ollama measurement is evidence only for model availability: a
 
 ## 2026-11-07 direct native local-agent path verified under the demo-prep runtime
 
-The preceding optional-path note describes the failed Python 3.13 runtime attempt. The direct native local-agent path is verified using the demo-prep Python 3.10 runtime at `.caps-tools/caps_guard_demo_prep/.venv310`; the bridge prefers that runtime and supports `CAPS_PYTHON` for an explicit override. This does not verify the separate native MCP stdio runner described below.
+The preceding optional-path note describes the failed Python 3.13 runtime attempt. The direct native local-agent path is verified using the demo-prep runtime selected by the bridge; the native MCP rehearsal uses the isolated Python 3.12 runtime when present. The machine-specific runtime remains a demo dependency, not a portable production requirement.
 
 Evidence from the synthetic demo:
 
@@ -182,11 +204,23 @@ The local `Y/n` approval behavior, fail-closed edge cases, branch base, and test
 
 ## Native MCP transport boundary — 2026-11-07
 
-The official MCP v2 Node server/client flow is verified separately. A Python LangGraph runner that calls that MCP client over a bounded stdio subprocess is implemented in `scripts/payroll_agent_mcp_demo.py`, but its import preflight is not yet verified on this machine. The preflight stalled inside `langgraph.checkpoint.sqlite` / LangChain / Pydantic before any Ollama `/api/generate` request or MCP tool call, and returned `RUNTIME_UNAVAILABLE` after the configured bound.
+The official MCP v2 Node server/client flow is verified separately. The Python
+LangGraph runner in `scripts/payroll_agent_mcp_demo.py` calls that client over
+a bounded stdio subprocess. The initial import-preflight stall is retained as
+historical evidence; the current isolated runtime completed the native demo
+rehearsal below.
 
-The reliable UI bridge default is the bounded deterministic Node planner over the official MCP stdio loop. The Python native runner remains opt-in; set `CAPS_NATIVE_TRANSPORT=mcp` only for explicit native-MCP testing. Do not claim the native MCP path as end-to-end until it proves natural language, local Ollama, LangGraph, MCP stdio, CAPS `REVIEW_REQUIRED`, persisted approve/reject resume, replay rejection, and exactly-once sink evidence in fresh processes.
+The native MCP rehearsal path has fresh-process evidence for natural language,
+local Ollama, LangGraph, MCP stdio, CAPS `REVIEW_REQUIRED`, persisted approval
+resume, and exactly-once sink execution across three warm approved rate-change
+runs, plus a native BLOCK run with zero sink calls. The UI selects it as the
+primary path when `CAPS_NATIVE_TRANSPORT=mcp` is enabled, but the corrected
+bridge still has intermittent cold-start stalls during a later approval
+continuation. Warm the path and complete the rehearsal gate before recording;
+the bounded deterministic Node planner remains the fallback. This is demo
+evidence, not a production authorization claim.
 
-The MCP lifecycle defect identified during this work was in the app's custom `LocalStdioTransport`: it did not provide the official MCP v2 negotiated-transport lifecycle/probe behavior. The bridge now uses the SDK's official `StdioClientTransport`. A historical isolated full MCP/HITL regression passed after that transport fix, before the later persistent-session change; the current standalone full smoke remains unconfirmed because it stalled during observation. This fixes the Node MCP transport boundary but does not bypass the separate Python LangGraph import preflight.
+The MCP lifecycle defect identified during this work was in the app's custom `LocalStdioTransport`: it did not provide the official MCP v2 negotiated-transport lifecycle/probe behavior. The bridge now uses the SDK's official `StdioClientTransport`. The current parent-app full smoke passes after the persistent-session change; this fixes the Node MCP transport boundary without weakening the Python model or CAPS boundaries.
 
 ## Native MCP verification update — 2026-11-08
 

@@ -23,6 +23,12 @@ const STATUS_ICONS = {
 };
 
 const upper = (value) => String(value || "").toUpperCase();
+const timingLabel = (stage) => String(stage || "").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+const durationLabel = (value) => {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return "—";
+  const milliseconds = Number(value);
+  return milliseconds >= 1000 ? `${(milliseconds / 1000).toFixed(2)}s` : `${Math.round(milliseconds)}ms`;
+};
 
 function node(id, label, state, detail) {
   return { id, label, state, detail: detail || STATUS_LABELS[state] };
@@ -156,6 +162,8 @@ export default function ExecutionGraph({ result, source = "agent", loading = fal
 
   const baseGraph=resultState(result,{loading,error,source});
   const nodes=applyLiveEvents(baseGraph.nodes,liveEvents);
+  const timing=result?.nativeTiming?.length?result.nativeTiming:result?.lifecycleTiming||result?.capsTiming||[];
+  const visibleTiming=timing.length<=14?timing:[...timing.slice(0,5),...timing.slice(-9)];
   const traceId=result?.traceId||result?.runId||result?.requestId||streamId||"created when the route runs";
   const executionEvidence = result?.executionEvidence || {};
   const hasBlockingOutcome = nodes.some(({ state }) => state === "blocked");
@@ -191,6 +199,16 @@ export default function ExecutionGraph({ result, source = "agent", loading = fal
       <span><i className="execution-legend-dot execution-legend-blocked" />Policy blocked</span>
       <span><i className="execution-legend-dot execution-legend-failed" />System error</span>
     </div>
+    {timing.length > 0 && <div className="execution-timing" aria-label="Execution timing">
+      <div className="execution-timing-heading"><span>Timing</span><strong>{durationLabel(timing.at(-1)?.elapsed_ms ?? timing.at(-1)?.elapsedMs)} total</strong></div>
+      <ol className="execution-timing-list">
+        {visibleTiming.map((item, index) => <li key={`${item.stage}-${item.timestamp_ms || item.timestamp || index}`} title={item.timestamp || undefined}>
+          <span>{timingLabel(item.stage)}</span>
+          <small>{item.detail || item.status || "Recorded"}</small>
+          <strong>+{durationLabel(item.delta_ms ?? item.deltaMs)}</strong>
+        </li>)}
+      </ol>
+    </div>}
     <div className="execution-graph-footer">
       <span>Trace</span><strong title={traceId}>{traceId}</strong>
       <span>Sink evidence</span><strong>{executionEvidence.toolCallCount ?? "—"} calls · {executionEvidence.toolResultCount ?? "—"} results</strong>

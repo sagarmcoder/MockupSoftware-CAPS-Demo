@@ -19,7 +19,7 @@ export function createCapsTraceId(candidate=null){
 
 function getTrace(traceId){
   if(!traces.has(traceId)){
-    traces.set(traceId,{traceId,events:[],createdAt:new Date().toISOString()});
+    traces.set(traceId,{traceId,events:[],createdAt:new Date().toISOString(),startedAtMs:Date.now()});
     trimTraceStore();
   }
   return traces.get(traceId);
@@ -31,6 +31,8 @@ function writeEvent(response,event){
 
 export function publishCapsLifecycle(traceId,{nodeId,status,detail=null,decision=null,reasonCode=null,terminal=false,source="caps-guard"}={}){
   const trace=getTrace(traceId);
+  const timestampMs=Date.now();
+  const previous=trace.events.at(-1);
   const event={
     event_id:randomUUID(),
     trace_id:traceId,
@@ -40,7 +42,10 @@ export function publishCapsLifecycle(traceId,{nodeId,status,detail=null,decision
     decision,
     reason_code:reasonCode,
     source,
-    timestamp:new Date().toISOString(),
+    timestamp:new Date(timestampMs).toISOString(),
+    timestamp_ms:timestampMs,
+    elapsed_ms:timestampMs-trace.startedAtMs,
+    delta_ms:previous?Math.max(0,timestampMs-(previous.timestamp_ms||timestampMs)):0,
     terminal
   };
   trace.events.push(event);
@@ -77,6 +82,27 @@ export function closeCapsEventStream(traceId,response){
   if(!listeners) return;
   listeners.delete(response);
   if(!listeners.size) subscribers.delete(traceId);
+}
+
+export function getCapsLifecycleTiming(traceId){
+  const trace=traces.get(traceId);
+  if(!trace) return [];
+  const selected=new Map();
+  for(const event of trace.events){
+    const replace=event.node_id!="request"&&event.node_id!="intent"&&event.node_id!="mcp";
+    if(replace||!selected.has(event.node_id)) selected.set(event.node_id,event);
+  }
+  return [...selected.values()].map((event)=>({
+    stage:event.node_id,
+    status:event.status,
+    detail:event.detail,
+    decision:event.decision,
+    timestamp:event.timestamp,
+    timestamp_ms:event.timestamp_ms,
+    elapsed_ms:event.elapsed_ms,
+    delta_ms:event.delta_ms,
+    source:event.source
+  }));
 }
 
 export function publishCapsRunLifecycle(traceId,result,{source="caps-guard"}={}){

@@ -1,0 +1,48 @@
+{
+  "manifest_id": "caps_payroll_demo",
+  "manifest_version": "1.0",
+  "description": "Synthetic payroll and time-entry tools for the CAPS Guard boundary demo.",
+  "tool_registry": [
+    {
+      "name": "search_time_entries",
+      "binding": "payroll_api",
+      "description": "Read synthetic employee time-entry summaries.",
+      "side_effect_class": "READ"
+    },
+    {
+      "name": "change_hourly_rate",
+      "binding": "payroll_api",
+      "description": "Change a synthetic employee hourly rate.",
+      "side_effect_class": "WRITE"
+    },
+    {
+      "name": "disburse_bank_payment",
+      "binding": "payroll_api",
+      "description": "Attempt a synthetic payroll bank disbursement.",
+      "side_effect_class": "IRREVERSIBLE"
+    }
+  ],
+  "sink_tools": [
+    "change_hourly_rate",
+    "disburse_bank_payment"
+  ],
+  "review_policies": {
+    "write_tools_require_review": true,
+    "block_irreversible_tools": true,
+    "sink_tools_require_review": true,
+    "precedence": [
+      "BLOCK",
+      "REVIEW_REQUIRED",
+      "ALLOW"
+    ],
+    "forbidden_arg_patterns": [
+      "drop table",
+      "delete from",
+      "truncate table"
+    ]
+  },
+  "constraint_flags": {
+    "enforce_tool_registry": true,
+    "allow_unknown_tools": false
+  }
+}
