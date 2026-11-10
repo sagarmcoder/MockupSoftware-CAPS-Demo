@@ -82,7 +82,7 @@ The UI must show the decision and executor status from trace artifacts. It must 
 - [x] Confirm `frontend/src/components/PayrollDashboard.jsx` is the current payroll view.
 - [x] Confirm `backend/server.js` exposes synthetic payroll and time-entry reads.
 - [x] Confirm the current backend is ES-module based and already owns `app.listen()`.
-- [x] Confirm `DEMO_AGENT_BOUNDARY.md` defines the connected CAPS boundary and its remaining limitations.
+- [x] Confirm [`DEMO_AGENT_BOUNDARY.md`](../../DEMO_AGENT_BOUNDARY.md) defines the connected CAPS boundary and its remaining limitations.
 - [x] Confirm no CAPS Guard manifest, plan, adapter, or trace integration exists in the app.
 - [x] Run the existing frontend build.
 - [ ] Run the backend smoke test against the local API, if already running.
@@ -168,7 +168,7 @@ The UI must show the decision and executor status from trace artifacts. It must 
 - [x] Native BLOCK trace captured.
 - [x] No blocked or pending scenario reached the synthetic sink.
 - [x] README documents setup, limitations, and exact claims.
-- [x] `DEMO_AGENT_BOUNDARY.md` is updated to distinguish deterministic plan-mode HITL from the optional prompt-mode gate and separate orchestration phase.
+- [x] [`DEMO_AGENT_BOUNDARY.md`](../../DEMO_AGENT_BOUNDARY.md) distinguishes deterministic plan-mode HITL from the native local-runtime path and production authorization.
 
 ## Phase 7 — Narrow demo-only MCP agent orchestration
 
@@ -217,7 +217,7 @@ Current result: deterministic plan-mode CAPS HITL is verified for the demo. Do n
 
 - [x] Record the distinction between local demo approval and production authorization.
 - [x] Record the proposed `Y/n` contract and edge-case matrix.
-- [x] Record the branch/base-commit and user-signal gate in [`authorized access.md`](authorized%20access.md).
+- [x] Record the branch/base-commit and user-signal gate in [`AUTHORIZED_ACCESS.md`](AUTHORIZED_ACCESS.md).
 - [x] Receive explicit user signal to proceed with demo-prep branch work.
 - [x] Create `demo/payroll-caps-prep` from the original public CAPS checkout at `4aa58cf…`.
 - [x] Add configurable Ollama host/request timeout controls.

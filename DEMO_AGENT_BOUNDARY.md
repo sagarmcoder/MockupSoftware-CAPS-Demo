@@ -200,7 +200,7 @@ This is a verified local synthetic demo path, not a production authorization cla
 
 ## Authorized access work (paused)
 
-The local `Y/n` approval behavior, fail-closed edge cases, branch base, and test matrix are documented in [`authorized access.md`](authorized%20access.md). The demo-prep branch is unmerged and unpushed. Its local reviewer is synthetic and does not establish production identity, RBAC, expiry, or replay protection.
+The local `Y/n` approval behavior, fail-closed edge cases, branch base, and test matrix are documented in [`docs/demo/AUTHORIZED_ACCESS.md`](docs/demo/AUTHORIZED_ACCESS.md). The demo-prep branch is separate from this application checkout. Its local reviewer is synthetic and does not establish production identity, RBAC, expiry, or replay protection.
 
 ## Native MCP transport boundary — 2026-11-07
 

@@ -1,6 +1,6 @@
 # SQLite Practice Track
 
-The executable answer workspace is `SQLITE_WORKBOOK.sql`. It repeats the questions as SQL comments and provides a blank area below each prompt. Use this Markdown file only as a compact overview.
+The executable answer workspace is [`../../exercises/SQLITE_WORKBOOK.sql`](../../exercises/SQLITE_WORKBOOK.sql). It repeats the questions as SQL comments and provides a blank area below each prompt. Use this Markdown file only as a compact overview.
 
 Use this file when working in DB Browser for SQLite. The business schema and data mirror the SQL Server sandbox, but SQLite syntax is not T-SQL.
 
@@ -33,4 +33,4 @@ Use this file when working in DB Browser for SQLite. The business schema and dat
 
 ## 5 — SQL Server comparison
 
-After each solution, identify how it would differ in T-SQL. SQLite does not implement stored procedures, SQL Server `CONVERT` styles, `CROSS APPLY`, or `OUTER APPLY`. Use `SQL_ADVANCED.md` and the files in `database/` to study those SQL Server-specific topics separately.
+After each solution, identify how it would differ in T-SQL. SQLite does not implement stored procedures, SQL Server `CONVERT` styles, `CROSS APPLY`, or `OUTER APPLY`. Use [`SQL_ADVANCED.md`](SQL_ADVANCED.md) and the files in [`../../database/`](../../database/) to study those SQL Server-specific topics separately.

@@ -1,4 +1,12 @@
-# Mockup Software — CAPS Guard Demo Sandbox
+# Mockup Software — CAPS Guard Payroll Demo
+
+This repository is a synthetic payroll and time-entry dashboard used to
+demonstrate CAPS Guard as an execution boundary for a local agent. It combines
+a React/Vite UI, a Node backend, SQLite data, local Ollama, the official MCP v2
+client/server, and server-owned CAPS Guard plans.
+
+The demo is intentionally bounded: it does not connect to real payroll data,
+real employees, real funds, or production authorization systems.
 
 A deliberately small local sandbox for unfamiliar-code navigation, SQL, UI changes, and the complete database-to-browser data path. It uses SQLite locally, so Docker, Azure, database accounts, and a separate database server are not required.
 
@@ -113,8 +121,9 @@ demo-prep checkout at `../.caps-tools/caps_guard_demo_prep` on branch
 for review approval, rejection, replay rejection, and payment blocking. It is
 an explicit opt-in local runtime; the first cold request can take roughly
 2–3 minutes while Python/LangGraph and MCP dependencies load, while warm
-actions are much faster. See [`DEMO_RUNBOOK.md`](DEMO_RUNBOOK.md) for the
-recording sequence and [`CAPS_GUARD_PAYROLL_TRACKER.md`](CAPS_GUARD_PAYROLL_TRACKER.md)
+actions are much faster. See [`docs/demo/DEMO_RUNBOOK.md`](docs/demo/DEMO_RUNBOOK.md)
+for the recording sequence and
+[`docs/demo/CAPS_GUARD_PAYROLL_TRACKER.md`](docs/demo/CAPS_GUARD_PAYROLL_TRACKER.md)
 for evidence and limitations.
 
 The dashboard also exposes a real local MCP agent path. The backend starts an official MCP v2 server over stdio and the bounded local agent uses the corresponding MCP client. The server advertises only three constrained capabilities:
@@ -141,10 +150,46 @@ user request
 ```
 
 ```bash
-npm run mcp-full-smoke --prefix backend
+env CAPS_MCP_CONNECT_TIMEOUT_MS=240000 \
+    CAPS_MCP_CONNECT_ATTEMPTS=1 \
+    CAPS_MCP_REQUEST_TIMEOUT_MS=240000 \
+    npm run mcp-full-smoke --prefix backend
 ```
 
 This verifies real protocol discovery, constrained calls, no pre-approval sink call, fresh-process review recovery, exactly one approved rate-change sink call, rejection, duplicate-resolution failure, continuation, and payment blocking.
+
+## Three recording cases
+
+| Case | CAPS result | Execution result |
+| --- | --- | --- |
+| View approved hours | `ALLOW` | `EXECUTED`, `CALLED` |
+| Change hourly rate | `REVIEW_REQUIRED` | Pauses for local approval or rejection |
+| Attempt payment | `BLOCK` | `BLOCKED`, `NOT_CALLED` |
+
+CAPS decisions and execution evidence come from structured traces. A process
+exit code of `0` is not treated as proof that a payroll action executed.
+
+## Native local-runtime startup
+
+```bash
+ollama serve
+curl http://127.0.0.1:11434/api/tags
+ollama ps
+```
+
+Start the backend with the native path explicitly enabled:
+
+```bash
+CAPS_NATIVE_TRANSPORT=mcp \
+CAPS_MCP_CONNECT_TIMEOUT_MS=180000 \
+CAPS_MCP_CONNECT_ATTEMPTS=1 \
+npm run backend
+```
+
+The Node backend owns a persistent official MCP session. Short-lived Python
+LangGraph start/resume processes use a token-protected loopback handoff, so a
+review approval does not reload a second cold MCP client. A timeout fails
+closed as `RUNTIME_UNAVAILABLE`/`NOT_CALLED`.
 
 ### Live CAPS execution graph
 
@@ -170,6 +215,21 @@ authoritative audit artifact. The in-memory event buffer is process-local, so a
 backend restart requires the UI to reconnect while persisted review and trace
 state remain separate.
 
+## Central documentation index
+
+Supporting Markdown is centralized under [`docs/README.md`](docs/README.md):
+
+- [`docs/demo/DEMO_RUNBOOK.md`](docs/demo/DEMO_RUNBOOK.md) — exact recording sequence.
+- [`docs/demo/CAPS_GUARD_PAYROLL_TRACKER.md`](docs/demo/CAPS_GUARD_PAYROLL_TRACKER.md) — checkbox tracker and evidence.
+- [`docs/demo/AUTHORIZED_ACCESS.md`](docs/demo/AUTHORIZED_ACCESS.md) — local HITL versus production authorization.
+- [`docs/database/README.md`](docs/database/README.md) — database reference.
+- [`docs/exercises/`](docs/exercises/) — SQL, frontend, full-stack, and interview notes.
+- [`docs/exercises/solutions/`](docs/exercises/solutions/) — exercise solution notes.
+
+The two boundary references remain intentionally visible at the repository
+root: [`DEMO_AGENT_BOUNDARY.md`](DEMO_AGENT_BOUNDARY.md) and
+[`NEWCAPSREADME.md`](NEWCAPSREADME.md).
+
 The old Phase 1 route remains:
 
 ```text
@@ -178,6 +238,30 @@ POST /api/mcp/intent
 ```
 
 It accepts only a bounded intent and display context, maps to a fixed server-owned scenario, and returns the CAPS trace-derived result. Both paths reject raw tool names, paths, manifests, arguments, and approval flags. Production RBAC/authenticated authorization is not claimed by this synthetic local demo.
+
+## CAPS Guard capability model
+
+CAPS Guard evaluates an already-resolved, bounded capability. It is not an LLM,
+an NLP synonym engine, or a replacement for identity and RBAC. Natural-language
+interpretation belongs upstream; the server owns the mapping from bounded
+intent to the concrete tool, plan, manifest, arguments, and review behavior.
+
+```text
+natural-language request
+        ↓
+bounded intent provider
+        ↓
+server-owned capability mapping
+        ↓
+CAPS Guard policy
+        ├── ALLOW            → executor may run
+        ├── REVIEW_REQUIRED  → persisted HITL decision, then resume/reject
+        └── BLOCK            → executor is not called
+```
+
+The model cannot supply raw tool names, filesystem paths, manifests, approval
+flags, or arbitrary execution arguments. The full local reference remains in
+[`NEWCAPSREADME.md`](NEWCAPSREADME.md).
 
 ## Follow one value
 
@@ -191,7 +275,7 @@ SQLite TimeEntries.HoursWorked
 
 ## Practice
 
-Open `exercises/SQLITE_WORKBOOK.sql` in DB Browser for SQLite. It contains every SQLite prompt as a comment followed by a blank answer area, so you can write and execute solutions without switching files. Then use `FRONTEND.md`, `FULL_STACK.md`, and `MOCK_INTERVIEW.md`. Do not open `exercises/solutions/` before completing your own attempt.
+Open `exercises/SQLITE_WORKBOOK.sql` in DB Browser for SQLite. It contains every SQLite prompt as a comment followed by a blank answer area, so you can write and execute solutions without switching files. Then use [`docs/exercises/FRONTEND.md`](docs/exercises/FRONTEND.md), [`docs/exercises/FULL_STACK.md`](docs/exercises/FULL_STACK.md), and [`docs/exercises/MOCK_INTERVIEW.md`](docs/exercises/MOCK_INTERVIEW.md). Do not open `docs/exercises/solutions/` before completing your own attempt.
 
 The original SQL Server files under `database/` remain only as clearly labeled T-SQL reference material. They are not used by the application. SQLite cannot execute SQL Server stored procedures, `CROSS APPLY`, `OUTER APPLY`, or SQL Server `CONVERT` styles.
 
