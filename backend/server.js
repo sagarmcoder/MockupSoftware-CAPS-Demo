@@ -11,8 +11,8 @@ import {
   NATIVE_INTERNAL_TOKEN
 } from "./caps-guard-bridge.js";
 import {listMcpTools,runMcpPayrollIntent} from "./mcp-agent.js";
-import {resolveLocalMcpEmployeeSelection,resolveLocalMcpPayrollReview,runLocalMcpPayrollAgent} from "./local-agent-process.js";
-import {callPayrollMcpTool,closePayrollMcpSession,getLastMcpTiming,getMcpReadiness,listPayrollMcpTools,warmPayrollMcpSession} from "./mcp-client.js";
+import {closeLocalMcpAgentWorker,getLocalMcpAgentReadiness,resolveLocalMcpEmployeeSelection,resolveLocalMcpPayrollReview,runLocalMcpPayrollAgent,warmLocalMcpAgentWorker} from "./local-agent-process.js";
+import {callPayrollMcpTool,closePayrollMcpSession,getLastMcpTiming,getMcpReadiness,listPayrollMcpTools} from "./mcp-client.js";
 import {createCapsTraceId,getCapsLifecycleTiming,openCapsEventStream,publishCapsLifecycle,publishCapsRunFailure,publishCapsRunLifecycle} from "./caps-guard-events.js";
 
 const app=createApiServer();
@@ -81,6 +81,11 @@ app.post("/api/mcp/local-agent/reviews/:reviewId/:decision",async(request,respon
 
 app.post("/api/mcp/local-agent/sessions/:sessionId/employee",async(request,response)=>{
   await runWithLifecycle(request,response,"local-agent",()=>resolveLocalMcpEmployeeSelection(request.params.sessionId,request.body?.employeeId));
+});
+
+app.get("/api/mcp/local-agent/readiness",(_request,response)=>{
+  const readiness=getLocalMcpAgentReadiness();
+  response.status(readiness.status==="failed"?503:200).json(readiness);
 });
 
 // Explicit opt-in native path for local-runtime experiments. It is deliberately
@@ -155,6 +160,7 @@ app.get("/api/native/readiness",(_request,response)=>{
   response.status(mcp.status==="failed"?503:200).json({
     status:mcp.status,
     mcp,
+    local_agent:getLocalMcpAgentReadiness(),
     ollama:{status:"external",detail:"Check Ollama with curl http://127.0.0.1:11434/api/tags"},
     native_worker:{status:"per_request",detail:"Python/LangGraph runner starts per native request"},
     caps:{status:"ready",detail:"Server-owned CAPS Guard routes are available"}
@@ -443,7 +449,9 @@ app.use((error,_request,response,_next)=>{
 
 app.listen(port,()=>{
   console.log(`SQLite practice API listening at http://localhost:${port}`);
-  void warmPayrollMcpSession().then((readiness)=>console.log(`Native MCP readiness: ${readiness.status} (${readiness.detail})`));
+  void warmLocalMcpAgentWorker()
+    .then((result)=>console.log(`Deterministic MCP worker readiness: ${(result.tools||[]).join(", ")}`))
+    .catch((error)=>console.error(`Deterministic MCP worker preflight failed: ${error.message}`));
 });
-process.once("SIGTERM",async()=>{await closePayrollMcpSession();process.exit(0);});
-process.once("SIGINT",async()=>{await closePayrollMcpSession();process.exit(0);});
+process.once("SIGTERM",async()=>{closeLocalMcpAgentWorker();await closePayrollMcpSession();process.exit(0);});
+process.once("SIGINT",async()=>{closeLocalMcpAgentWorker();await closePayrollMcpSession();process.exit(0);});

@@ -9,23 +9,55 @@ const APP_ROOT=fileURLToPath(new URL("..",import.meta.url));
 const SESSION_ROOT=resolve(APP_ROOT,"caps",".runtime","agent-sessions");
 const MAX_PROMPT_LENGTH=240;
 
+const NUMBER_WORDS=Object.freeze({
+  zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,
+  eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,
+  eighteen:18,nineteen:19,twenty:20,thirty:30,forty:40,fifty:50,sixty:60,
+  seventy:70,eighty:80,ninety:90
+});
+const NUMBER_WORD_PATTERN="(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:[- ](?:one|two|three|four|five|six|seven|eight|nine))?";
+const RATE_TOKEN_PATTERN=`(?:\\$|CAD\\s*)?\\d{1,3}(?:\\.\\d+)?|${NUMBER_WORD_PATTERN}`;
+
+function numberFromPromptToken(value){
+  const normalized=value.trim().replace(/^\$|^CAD\s*/i,"").toLowerCase().replace(/-/g," ");
+  if(/^\d+(?:\.\d+)?$/.test(normalized)) return Number(normalized);
+  const parts=normalized.split(/\s+/).filter(Boolean);
+  if(!parts.length||parts.some((part)=>NUMBER_WORDS[part]===undefined)) return null;
+  return parts.reduce((total,part)=>total+NUMBER_WORDS[part],0);
+}
+
+function rateDetailsFromPrompt(prompt){
+  const range=new RegExp(`\\bfrom\\s+(${RATE_TOKEN_PATTERN})\\s+to\\s+(${RATE_TOKEN_PATTERN})\\b`,"i").exec(prompt);
+  if(range){
+    return {currentRate:numberFromPromptToken(range[1]),proposedRate:numberFromPromptToken(range[2])};
+  }
+  const values=[...prompt.matchAll(new RegExp(`\\b(${RATE_TOKEN_PATTERN})\\b`,"gi"))]
+    .map((match)=>numberFromPromptToken(match[1]))
+    .filter((value)=>value!==null);
+  return {currentRate:null,proposedRate:values.at(-1)??null};
+}
+
 function rateFromPrompt(prompt){
-  const match=prompt.match(/(?:\$|CAD\s*)?(\d+(?:\.\d+)?)\s*(?:per\s*hour|\/\s*h(?:our)?|hourly)?\b/i);
-  return match?Number(match[1]):null;
+  return rateDetailsFromPrompt(prompt).proposedRate;
 }
 
 function employeeQueryFromPrompt(prompt){
   const trimTrailingActionWords=(value)=>{
-    const stopWords=new Set(["hour","hourly","hours","rate","to","using","at","with","new","per","payment"]);
+    const stopWords=new Set(["hour","hourly","hours","rate","pay","to","using","at","with","new","per","payment","now"]);
     const words=value.trim().split(/\s+/);
     while(words.length>1&&stopWords.has(words.at(-1).toLowerCase())) words.pop();
     return words.join(" ");
   };
   const patterns=[
-    /\b([A-Za-z][A-Za-z'-]*)['’]s?\s+(?:hourly\s+)?(?:change\s+)?rate\b/i,
-    /\b(?:change|show)\s+(?:the\s+)?(?:hourly\s+)?(?:rate\s+for\s+)?([A-Za-z][A-Za-z'-]*(?:\s+[A-Za-z][A-Za-z'-]*)?)(?=\s+(?:hourly|rate|hours|to|using|at|with|new|per)\b|\s*\$|$)/i,
-    /\b(?:pay|payment|release\s+payment)\s+(?:for\s+)?([A-Za-z][A-Za-z'-]*(?:\s+[A-Za-z][A-Za-z'-]*)?)(?=\s|$)/i,
-    /\bfor\s+([A-Za-z][A-Za-z'-]*(?:\s+[A-Za-z][A-Za-z'-]*)?)(?=\s+(?:to|using|with|at)\b|\s*\$|$)/i
+    /\b(?:change|set|bump|move|moved|raise|increase|update)\s+([A-Za-z][A-Za-z'-]*)['’]s?\s+(?:hourly\s+)?(?:change\s+)?(?:rate|pay)\b/i,
+    /\b([A-Za-z][A-Za-z'-]*(?:\s+[A-Za-z][A-Za-z'-]*)?)['’]s?\s+(?:hourly\s+)?(?:change\s+)?(?:rate|pay)\b/i,
+    /\b(?:change|set|bump|move|moved|raise|increase|update)\s+(?:the\s+)?(?:hourly\s+)?(?:rate\s+for\s+)?([A-Za-z][A-Za-z'-]*(?:\s+[A-Za-z][A-Za-z'-]*)?)(?=\s+(?:hourly|rate|pay|hours|to|from|using|at|with|new|per|an|now)\b|\s*\$|[?.!,]|$)/i,
+    /\b([A-Za-z][A-Za-z'-]*(?:\s+[A-Za-z][A-Za-z'-]*)?)\s+should\s+be\s+making\b/i,
+    /\b(?:pay|payment|release\s+payment)\s+(?:for\s+)?([A-Za-z][A-Za-z'-]*(?:\s+[A-Za-z][A-Za-z'-]*)?)(?=\s+(?:using|with|at|the|new|rate)\b|\s*\$|[?.!,]|$)/i,
+    /\bfor\s+([A-Za-z][A-Za-z'-]*(?:\s+[A-Za-z][A-Za-z'-]*)?)(?=\s+(?:to|from|using|with|at|the|new|rate)\b|\s*\$|[?.!,]|$)/i,
+    /\b(?:show|view|get)\s+([A-Za-z][A-Za-z'-]*(?:\s+[A-Za-z][A-Za-z'-]*)?)(?=\s+(?:hours|time\s+entries|time\s+worked)\b)/i,
+    /\b(?:show|view|get)\s+(?:the\s+)?(?:hours|time\s+entries|time\s+worked)\s+(?:for\s+)?([A-Za-z][A-Za-z'-]*(?:\s+[A-Za-z][A-Za-z'-]*)?)(?=[?.!,]|$)/i,
+    /\b(?:can\s+you|please|i\s+need)\s+([A-Za-z][A-Za-z'-]*)\s+(?=(?:to|from|should|is|moved)\b)/i
   ];
   for(const pattern of patterns){
     const match=prompt.match(pattern);
@@ -38,12 +70,13 @@ export function parsePayrollRequest(prompt){
   if(typeof prompt!=="string"||!prompt.trim()||prompt.trim().length>MAX_PROMPT_LENGTH) throw new Error("Local agent prompt must be 1-240 characters");
   const text=prompt.trim();
   const lower=text.toLowerCase();
-  const rate=rateFromPrompt(text);
-  const payIntent=/\b(pay|payment|payroll|disburse|release)\b/.test(lower);
-  const rateIntent=/\b(rate|hourly|per\s+hour)\b/.test(lower)&&rate!==null;
+  const rateDetails=rateDetailsFromPrompt(text);
+  const rate=rateDetails.proposedRate;
+  const payIntent=/^\s*pay\s+[A-Za-z]/i.test(text)||/\b(?:release|disburse)\b.*\b(?:pay|payment|payroll|funds?)\b/i.test(text);
+  const rateIntent=rate!==null&&(/\b(rate|hourly|per\s+hour|making|moved\s+from|hourly\s+pay)\b/.test(lower)||/\b(?:change|set|bump|raise|increase|move|moved)\b/.test(lower));
   const hoursIntent=/\b(hours|time entries|time\s+worked)\b/.test(lower);
   const intent=rateIntent?"change_rate":payIntent?"release_payment":hoursIntent?"view_hours":null;
-  return {prompt:text,intent,rate,employeeQuery:employeeQueryFromPrompt(text),payIntent};
+  return {prompt:text,intent,rate,currentRate:rateDetails.currentRate,employeeQuery:employeeQueryFromPrompt(text),payIntent,rateIntent};
 }
 
 export function planPayrollRequest(prompt,employee=null){

@@ -4,6 +4,10 @@ This document defines the safety boundary for the synthetic CAPS Guard demonstra
 
 Current status: the native path now passes `REVIEW_REQUIRED -> approval -> 1 call / 1 result`, rejection, replay rejection, and payment `BLOCK -> 0 calls -> terminal audit` through the backend-owned persistent MCP session. A first successful native cold start measured about 158 seconds on this machine; warm actions completed in roughly 1–5 seconds. That startup variance is a local runtime limitation, not a CAPS policy result. Production authorization remains out of scope.
 
+The reusable architecture, current capability matrix, naming recommendation, and
+natural-language variation evidence are maintained in
+[`docs/demo/BOUNDED_CAPABILITY_ARCHITECTURE.md`](docs/demo/BOUNDED_CAPABILITY_ARCHITECTURE.md).
+
 ## Current native boundary correction — 2026-11-10
 
 The earlier approval stall came from the Python start/resume processes each

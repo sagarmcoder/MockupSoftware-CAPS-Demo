@@ -12,7 +12,7 @@ for (const field of ["TimeEntryId", "EmployeeName", "WorkDate", "HoursWorked"]) 
 }
 
 const summary = await fetch(`${baseUrl}/api/summary-dashboard`).then((response) => response.json());
-if (!summary.metrics || !Array.isArray(summary.monthly) || summary.orchestration?.mcpToolCount !== 1) throw new Error("Summary dashboard incomplete or MCP orchestration state misstated");
+if (!summary.metrics || !Array.isArray(summary.monthly) || summary.orchestration?.mcpToolCount !== 3) throw new Error("Summary dashboard incomplete or MCP orchestration state misstated");
 
 const employees = await fetch(`${baseUrl}/api/employee-scorecards`).then((response) => response.json());
 if (!Array.isArray(employees) || employees.length < 80) throw new Error("Employee scorecards missing");

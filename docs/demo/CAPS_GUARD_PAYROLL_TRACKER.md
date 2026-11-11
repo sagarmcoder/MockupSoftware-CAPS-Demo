@@ -9,6 +9,10 @@ Status: Full local MCP + bounded agent + persisted CAPS HITL loop implemented; n
 - [x] Native rejection passed: `REVIEW_REQUIRED` → `REJECTED`/`NOT_CALLED` with zero sink calls.
 - [x] Native irreversible payment passed: `BLOCKED`/`BLOCKED`/`NOT_CALLED` with zero calls/results.
 - [x] The private handoff rejects an invalid internal token with HTTP `403`; structured native results remain trace-derived rather than exit-code-derived.
+- [x] The deterministic local resolver accepts five natural-language rate-change variants, including number words and `from`/`to` rate context, while keeping hourly pay distinct from payment continuation.
+- [x] Added [`BOUNDED_CAPABILITY_ARCHITECTURE.md`](BOUNDED_CAPABILITY_ARCHITECTURE.md) with the current implementation map, generic naming model, capability matrix, NL evidence, and reusable-domain boundary.
+- [x] Moved deterministic MCP worker preflight into a child process so the HTTP server stays responsive while the local SDK loads; the backend log reports worker readiness before recording.
+- [x] Added `/api/mcp/local-agent/readiness` and UI readiness gating so deterministic-agent buttons remain disabled during cold MCP loading instead of queuing an invisible request behind the prewarm.
 - [ ] Cold-start performance is not portable: this machine measured roughly 158 seconds for one first successful native start while Python/LangGraph and MCP dependencies loaded. Warm native actions completed in roughly 1–5 seconds. This is a runtime-latency limitation, not a CAPS policy failure.
 - [ ] Production identity, RBAC, reviewer authorization, expiry, and distributed replay protection remain outside this synthetic local demo.
 

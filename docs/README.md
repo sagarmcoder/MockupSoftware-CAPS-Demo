@@ -10,6 +10,7 @@ linked below.
 - [`../NEWCAPSREADME.md`](../NEWCAPSREADME.md) — local CAPS Guard capability-boundary reference.
 - [`demo/DEMO_RUNBOOK.md`](demo/DEMO_RUNBOOK.md) — exact recording and startup sequence.
 - [`demo/CAPS_GUARD_PAYROLL_TRACKER.md`](demo/CAPS_GUARD_PAYROLL_TRACKER.md) — implementation tracker and evidence.
+- [`demo/BOUNDED_CAPABILITY_ARCHITECTURE.md`](demo/BOUNDED_CAPABILITY_ARCHITECTURE.md) — current architecture map, naming, capability matrix, and NL evidence.
 - [`demo/AUTHORIZED_ACCESS.md`](demo/AUTHORIZED_ACCESS.md) — local HITL versus production authorization.
 
 ## Project references

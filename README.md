@@ -230,6 +230,7 @@ Supporting Markdown is centralized under [`docs/README.md`](docs/README.md):
 
 - [`docs/demo/DEMO_RUNBOOK.md`](docs/demo/DEMO_RUNBOOK.md) — exact recording sequence.
 - [`docs/demo/CAPS_GUARD_PAYROLL_TRACKER.md`](docs/demo/CAPS_GUARD_PAYROLL_TRACKER.md) — checkbox tracker and evidence.
+- [`docs/demo/BOUNDED_CAPABILITY_ARCHITECTURE.md`](docs/demo/BOUNDED_CAPABILITY_ARCHITECTURE.md) — current architecture map, naming recommendation, capability matrix, and NL variation evidence.
 - [`docs/demo/AUTHORIZED_ACCESS.md`](docs/demo/AUTHORIZED_ACCESS.md) — local HITL versus production authorization.
 - [`docs/database/README.md`](docs/database/README.md) — database reference.
 - [`docs/exercises/`](docs/exercises/) — SQL, frontend, full-stack, and interview notes.

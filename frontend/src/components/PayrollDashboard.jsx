@@ -23,12 +23,31 @@ export default function PayrollDashboard(){
   const [agentLoading,setAgentLoading]=useState(false);
   const [agentError,setAgentError]=useState("");
   const [agentTraceId,setAgentTraceId]=useState("");
+  const [agentReadiness,setAgentReadiness]=useState(null);
 
   useEffect(()=>{
     fetch("/api/payroll-dashboard")
       .then((response)=>{if(!response.ok) throw new Error(`API returned ${response.status}`);return response.json();})
       .then((result)=>{setData(result);setError("");})
       .catch((requestError)=>setError(requestError.message));
+  },[]);
+
+  useEffect(()=>{
+    let active=true;
+    let timer=null;
+    const checkReadiness=async()=>{
+      try{
+        const response=await fetch("/api/mcp/local-agent/readiness");
+        const result=await response.json();
+        if(!active) return;
+        setAgentReadiness(result);
+        if(result.status==="not_started"||result.status==="starting") timer=setTimeout(checkReadiness,2000);
+      }catch(requestError){
+        if(active) setAgentReadiness({status:"failed",detail:requestError.message,tools:[]});
+      }
+    };
+    void checkReadiness();
+    return ()=>{active=false;if(timer) clearTimeout(timer);};
   },[]);
 
   const runGuardScenario=async(scenarioKey)=>{
@@ -78,6 +97,8 @@ export default function PayrollDashboard(){
     }catch(requestError){setAgentError(requestError.message);}
     finally{setAgentLoading(false);}
   };
+
+  const deterministicAgentReady=agentReadiness?.status==="ready";
 
   const resolveLocalAgent=async(decision)=>{
     const reviewId=agentResult?.review?.reviewId;
@@ -200,8 +221,9 @@ export default function PayrollDashboard(){
           <button className={agentMode==="native"?"is-selected":""} onClick={()=>setAgentMode("native")} disabled={agentLoading}>Native Ollama + LangGraph</button>
           <button className={agentMode==="deterministic"?"is-selected":""} onClick={()=>setAgentMode("deterministic")} disabled={agentLoading}>Deterministic MCP fallback</button>
         </div>
-        <button className="guard-approve" onClick={runLocalAgent} disabled={agentLoading||!agentPrompt.trim()}>{agentMode==="native"?"Run native agent":"Run deterministic agent"}</button>
+        <button className="guard-approve" onClick={runLocalAgent} disabled={agentLoading||!agentPrompt.trim()||(agentMode==="deterministic"&&!deterministicAgentReady)}>{agentMode==="native"?"Run native agent":"Run deterministic agent"}</button>
       </div>
+      {agentMode==="deterministic"&&!deterministicAgentReady&&<p className="agent-progress" role="status">{agentReadiness?.status==="failed"?`The deterministic MCP worker is unavailable: ${agentReadiness.detail}`:"The deterministic MCP worker is prewarming the official MCP stdio session. The run button unlocks when it is ready."}</p>}
       {agentLoading&&<p className="agent-progress" role="status">{agentMode==="native"?"The native Python/LangGraph runtime is starting, then Ollama will interpret the request before MCP and CAPS Guard. Timing appears in the graph below.":"The bounded agent is resolving the request through MCP and CAPS Guard."}</p>}
       {agentError&&<p className="error guard-error">{agentError}</p>}
       <ExecutionGraph result={agentResult} source="agent" loading={agentLoading} error={agentError} streamId={agentTraceId} />

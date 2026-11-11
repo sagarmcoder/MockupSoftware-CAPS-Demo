@@ -53,13 +53,27 @@ Verify the backend and capability boundary before opening the UI:
 curl http://127.0.0.1:3001/api/health
 curl http://127.0.0.1:3001/api/mcp/tools
 curl http://127.0.0.1:3001/api/native/readiness
-until curl -fsS http://127.0.0.1:3001/api/native/readiness | grep -q '"status":"ready"'; do sleep 2; done
 ```
+
+The backend deliberately does not prewarm the MCP SDK inside the main HTTP
+startup callback. A cold synchronous package load can otherwise make the page
+appear crashed before the first action. After the listener is available, the
+backend starts an isolated deterministic-worker preflight. `status:
+"not_started"` is healthy at the first instant; the UI then shows `Preparing`
+and disables deterministic-agent buttons until `/api/mcp/local-agent/readiness`
+reports `ready`. A status of `failed` is a runtime failure, not an ALLOW/BLOCK
+result.
 
 There is no separate MCP daemon command in this repository. The Node MCP client
 spawns the official stdio MCP server when a native capability call is made, and
 the native Python/LangGraph process is spawned for the native request. The
 backend command above is the CAPS/API boundary for both.
+
+At backend startup, the deterministic MCP worker preflights `tools/list` in a
+separate child process. The HTTP server remains responsive while that preflight
+loads. Wait for the backend log line `Deterministic MCP worker readiness:` or
+for the UI status to change from `Preparing` to `Connected` before recording
+the deterministic fallback path.
 
 The demo backend uses the non-watch start command so it is not blocked by the
 local file-watcher limit. Use `npm run backend:watch` only when you explicitly
@@ -259,6 +273,26 @@ Narrative: CAPS blocks the irreversible payment capability deterministically. Th
 
 ## Evidence to show
 
+## Optional natural-language variation proof
+
+To show that the capability boundary is not tied to one sentence, use these
+rate-change phrasings in the deterministic fallback rehearsal. Each resolves to
+the same bounded `change_rate` capability and then follows the same CAPS review
+path:
+
+```text
+Change Alex's rate to $42.
+Alex should be making 42 now.
+Can you bump Alex to forty-two an hour?
+Set Alex's hourly pay to $42.
+I need Alex moved from 38 to 42.
+```
+
+The regression is `npm run nl-smoke`. This proves the bounded local parser's
+supported variation set; it does not claim universal Ollama language
+understanding. Regardless of wording, the model or parser must produce the
+same validated intent schema before MCP and CAPS are called.
+
 For every case, show the structured result rather than relying on process exit code or terminal text:
 
 - decision: `ALLOW`, `REVIEW_REQUIRED`, or `BLOCK`
@@ -280,12 +314,12 @@ MCP fallback** selector if the local native runtime is unavailable. Do not call
 that fallback a native Ollama run.
 
 The first MCP action may include local SDK/process cold-start latency. The
-Node bridge runs the bounded agent in a persistent worker process so a cold SDK
-import cannot freeze the HTTP server; the worker reuses its official MCP stdio
-session while warm. Persisted SQLite review state remains server-owned. Warm
-the backend and complete one full approved native rehearsal before recording;
-this machine has shown cold local MCP/CAPS runs from about 28 seconds to
-nearly five minutes, while warm calls are normally much faster.
+Node bridge runs the deterministic bounded agent in a persistent worker process
+so a cold SDK import cannot freeze the HTTP server; the worker reuses its
+official MCP stdio session while warm. Persisted SQLite review state remains
+server-owned. Complete one full approved rehearsal before recording; this
+machine has shown cold local MCP/CAPS runs from about 28 seconds to nearly five
+minutes, while warm calls are normally much faster.
 
 ## What to say about MCP orchestration
 

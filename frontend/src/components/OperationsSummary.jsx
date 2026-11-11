@@ -17,6 +17,7 @@ export default function OperationsSummary(){
   const [agentLoading,setAgentLoading]=useState("");
   const [agentError,setAgentError]=useState("");
   const [agentTraceId,setAgentTraceId]=useState("");
+  const [agentReadiness,setAgentReadiness]=useState(null);
 
   useEffect(()=>{
     fetch("/api/summary-dashboard")
@@ -25,7 +26,26 @@ export default function OperationsSummary(){
       .catch((requestError)=>setError(requestError.message));
   },[]);
 
+  useEffect(()=>{
+    let active=true;
+    let timer=null;
+    const checkReadiness=async()=>{
+      try{
+        const response=await fetch("/api/mcp/local-agent/readiness");
+        const result=await response.json();
+        if(!active) return;
+        setAgentReadiness(result);
+        if(result.status==="not_started"||result.status==="starting") timer=setTimeout(checkReadiness,2000);
+      }catch(requestError){
+        if(active) setAgentReadiness({status:"failed",detail:requestError.message,tools:[]});
+      }
+    };
+    void checkReadiness();
+    return ()=>{active=false;if(timer) clearTimeout(timer);};
+  },[]);
+
   const maxMonth=useMemo(()=>Math.max(1,...(data?.monthly||[]).map((month)=>month.Hours)),[data]);
+  const localAgentReady=agentReadiness?.status==="ready";
 
   const routeAgentIntent=async(intent)=>{
     const traceId=createTraceId("summary-agent");
@@ -121,15 +141,16 @@ export default function OperationsSummary(){
         </article>
 
         <article className="summary-card orchestration-card">
-          <div className="orchestration-title"><div><span className="eyebrow">Agent readiness</span><h2>MCP orchestration</h2></div><span className="connected">Connected</span></div>
+          <div className="orchestration-title"><div><span className="eyebrow">Agent readiness</span><h2>MCP orchestration</h2></div><span className={`connected orchestration-${agentReadiness?.status||"starting"}`}>{localAgentReady?"Connected":agentReadiness?.status==="failed"?"Unavailable":"Preparing"}</span></div>
           <p>{data.orchestration.note}</p>
           <div className="tool-chips">{data.orchestration.proposedTools.map((tool)=><code key={tool}>{tool}</code>)}</div>
           <div className="agent-intent-actions">
-            <button onClick={()=>routeAgentIntent("view_hours")} disabled={Boolean(agentLoading)}>{agentLoading==="view_hours"?"Checking…":"Ask for hours"}</button>
-            <button onClick={()=>routeAgentIntent("change_rate")} disabled={Boolean(agentLoading)}>{agentLoading==="change_rate"?"Checking…":"Ask to change rate"}</button>
-            <button onClick={()=>routeAgentIntent("release_payment")} disabled={Boolean(agentLoading)}>{agentLoading==="release_payment"?"Checking…":"Ask to release payment"}</button>
+            <button onClick={()=>routeAgentIntent("view_hours")} disabled={Boolean(agentLoading)||!localAgentReady}>{agentLoading==="view_hours"?"Checking…":"Ask for hours"}</button>
+            <button onClick={()=>routeAgentIntent("change_rate")} disabled={Boolean(agentLoading)||!localAgentReady}>{agentLoading==="change_rate"?"Checking…":"Ask to change rate"}</button>
+            <button onClick={()=>routeAgentIntent("release_payment")} disabled={Boolean(agentLoading)||!localAgentReady}>{agentLoading==="release_payment"?"Checking…":"Ask to release payment"}</button>
           </div>
-          {agentLoading&&<p className="agent-progress" role="status">The local agent is contacting the official MCP server and CAPS Guard. A cold local start can take up to two minutes; the page remains responsive.</p>}
+          {!localAgentReady&&<p className="agent-progress" role="status">{agentReadiness?.status==="failed"?`The deterministic MCP worker is unavailable: ${agentReadiness.detail}`:"The deterministic MCP worker is prewarming the official MCP stdio session. Actions unlock when it is ready."}</p>}
+          {agentLoading&&<p className="agent-progress" role="status">The local agent is contacting the official MCP server and CAPS Guard. The page remains responsive.</p>}
           {agentError&&<p className="error">{agentError}</p>}
           <ExecutionGraph result={agentResult} source="agent" loading={Boolean(agentLoading)} error={agentError} streamId={agentTraceId} />
           {agentResult&&<div className="agent-result" aria-live="polite">

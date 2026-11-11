@@ -1,4 +1,4 @@
-import {closePayrollMcpSession} from "./mcp-client.js";
+import {closePayrollMcpSession,listPayrollMcpTools} from "./mcp-client.js";
 import {resolveLocalMcpEmployeeSelection,resolveLocalMcpPayrollReview,runLocalMcpPayrollAgent} from "./payroll-agent.js";
 import {createInterface} from "node:readline";
 
@@ -11,7 +11,9 @@ async function readInput(){
 }
 
 async function execute(input,requestedCommand){
-  return requestedCommand==="run"
+  return requestedCommand==="preflight"
+    ? {tools:(await listPayrollMcpTools()).map((tool)=>tool.name)}
+    : requestedCommand==="run"
     ? runLocalMcpPayrollAgent(input.prompt)
     : requestedCommand==="resolve"
       ? resolveLocalMcpPayrollReview(input.reviewId,input.decision)
